@@ -7,7 +7,12 @@ const session = require('express-session')
 const { MongoStore } = require('connect-mongo')
 const connectDB = require('./config/db')
 const authController = require('./controllers/authController')
+const boardController = require('./controllers/boardController')
+const boardPhotoController = require('./controllers/boardPhotoController')
+const searchController = require('./controllers/searchController')
+const collaboratorController = require('./controllers/collaboratorController')
 const requireAuth = require('./middleware/requireAuth')
+const loadBoard = require('./middleware/loadBoard')
 
 for (const key of ['MONGO_URI', 'SESSION_SECRET']) {
     if (!process.env[key]) {
@@ -93,49 +98,97 @@ app.get('/api/auth/me', authController.me)         // current session's user, or
  * captures the literal string "discover" and Mongoose throws trying to cast it
  * to an ObjectId. Same rule for any other fixed path under /api/boards.
  */
-app.get('/api/boards/discover', notImplemented)    // public boards feed
-app.post('/api/boards', notImplemented)            // create (name only; tags fill in later)
-app.get('/api/boards/:id', notImplemented)
-app.patch('/api/boards/:id', notImplemented)       // owner only: rename, toggle isPublic
-app.delete('/api/boards/:id', notImplemented)      // owner only; also clears its BoardPhoto links
+app.get('/api/boards/discover', boardController.discover)    // public boards feed
+app.post('/api/boards', requireAuth, boardController.create)
+app.get('/api/boards/:id', loadBoard('view'), boardController.show)
+app.patch('/api/boards/:id', requireAuth, loadBoard('own'), boardController.update)
+app.delete('/api/boards/:id', requireAuth, loadBoard('own'), boardController.remove)
 
 // Share link. A separate path from /api/boards/:id because holding the slug is
 // its own route to viewing — it works even when the board is private.
-app.get('/api/b/:shareSlug', notImplemented)
+app.get('/api/b/:shareSlug', boardController.showBySlug)
 
 /* --- Board contents ----------------------------- boardPhotoController.js --
  * Operates on the BoardPhoto join, not on Photo itself. Removing a photo here
  * deletes the link and leaves the canonical Photo alone, since other boards
  * may still reference it. Writes require owner-or-collaborator.
  */
-app.get('/api/boards/:id/photos', notImplemented)  // ?sort=asc|desc on addedAt
-app.post('/api/boards/:id/photos', notImplemented) // upsert Photo, create link, resync board tags
-app.delete('/api/boards/:id/photos/:photoId', notImplemented)  // delete link, resync board tags
+app.get('/api/boards/:id/photos', loadBoard('view'), boardPhotoController.list)  // ?sort=asc|desc
+app.post('/api/boards/:id/photos', requireAuth, loadBoard('edit'), boardPhotoController.add)
+app.delete('/api/boards/:id/photos/:photoId', requireAuth, loadBoard('edit'), boardPhotoController.remove)
 
 /* --- Bookmarks & profile ------------------------------ boardController.js --
  * Saving someone else's board is a bookmark, not a copy: it pushes an id onto
  * User.savedBoards. May end up folded into the board controller rather than
  * standing alone.
  */
-app.post('/api/boards/:id/save', notImplemented)
-app.delete('/api/boards/:id/save', notImplemented)
-app.get('/api/me/boards', notImplemented)          // the 3 profile sections: owned / saved / collaborating
+app.post('/api/boards/:id/save', requireAuth, loadBoard('view'), boardController.save)
+app.delete('/api/boards/:id/save', requireAuth, loadBoard('view'), boardController.unsave)
+app.get('/api/me/boards', requireAuth, boardController.myBoards)   // owned / saved / collaborating
 
 /* --- Collaboration ----------------------------- collaboratorController.js --
  * inviteToken is deliberately separate from shareSlug so that sharing a board
  * to be seen never hands out edit rights. Permissions are flat: any
  * collaborator can edit anything on the board.
  */
-app.post('/api/boards/:id/invite', notImplemented)            // owner: generate or rotate the token
-app.post('/api/invite/:inviteToken', notImplemented)          // accept: become a collaborator
-app.delete('/api/boards/:id/collaborators/:userId', notImplemented)  // owner: revoke access
+app.post('/api/boards/:id/invite', requireAuth, loadBoard('own'), collaboratorController.invite)
+app.post('/api/invite/:inviteToken', requireAuth, collaboratorController.accept)
+app.delete('/api/boards/:id/collaborators/:userId', requireAuth, loadBoard('own'), collaboratorController.revoke)
 
 /* --- Search & Discover ------------------------------- searchController.js --
  * The Pixabay key stays server-side, so the random feed goes through our own
  * proxy rather than being called from the browser.
  */
-app.get('/api/photos/search', notImplemented)      // ?tags=sunset,beach&sort= — visible boards only
-app.get('/api/discover', notImplemented)           // Pixabay proxy; filters out the user's saved images
+app.get('/api/photos/search', searchController.searchPhotos)  // ?tags=sunset,beach&sort=
+app.get('/api/discover', searchController.discoverPhotos)     // Pixabay proxy; hides saved images
+
+// Nothing matched. Express would send an HTML page here, and every other
+// response in this API is JSON — a typo'd URL shouldn't break the client's parse.
+app.use((req, res) => {
+    res.status(404).json({ error: 'Not found' })
+})
+
+/**
+ * ---------------------------------------------------------------------------
+ * ERROR HANDLER
+ *
+ * Must be registered LAST — Express only hands an error to middleware declared
+ * after the route that produced it.
+ *
+ * The four-argument signature is what marks this as an error handler rather
+ * than an ordinary one; Express dispatches on arity, so dropping the unused
+ * `next` would silently turn this back into a normal middleware that never runs.
+ * ---------------------------------------------------------------------------
+ */
+app.use((err, req, res, next) => {
+    // Something already started writing the response, so the status and headers
+    // are locked in. Only Express's default handler can close out a half-sent
+    // response; trying to send our own JSON here would throw a second error.
+    if (res.headersSent) return next(err)
+
+    // A malformed ObjectId in the URL is a bad request, not a server fault —
+    // it means the client asked for an id that could never exist.
+    if (err.name === 'CastError') {
+        return res.status(400).json({ error: 'Malformed id' })
+    }
+
+    if (err.name === 'ValidationError') {
+        return res.status(400).json({ error: err.message })
+    }
+
+    // Unique-index violation. Routes that can say something specific about
+    // WHICH constraint broke (register, for one) handle 11000 themselves; this
+    // is the generic fallback for the rest.
+    if (err.code === 11000) {
+        return res.status(409).json({ error: 'Already exists' })
+    }
+
+    // Log the real error server-side, return a generic one to the client. The
+    // default Express handler would send the stack trace — including absolute
+    // file paths — straight to the browser.
+    console.error(err)
+    res.status(500).json({ error: 'Something went wrong' })
+})
 
 app.listen(port, ()=>{
     console.log(`listening on http://localhost:${port}/api/hello`)

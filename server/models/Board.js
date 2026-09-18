@@ -52,6 +52,13 @@ const boardSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
   }],
+  // Users the owner has removed. Without this, revoking is cosmetic: the
+  // invite link still works, so anyone removed can immediately re-accept it.
+  // Cleared when the token is rotated, since a new link is a new grant.
+  revokedUsers: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+  }],
 }, { timestamps: true });
 
 // Board names are unique per owner, not globally — two different users can each
@@ -84,6 +91,17 @@ boardSchema.methods.canEdit = function (userId) {
 boardSchema.methods.isOwner = function (userId) {
   if (!userId) return false;
   return this.owner.equals(userId);
+};
+
+/**
+ * Issues a new inviteToken, invalidating every edit link handed out before now.
+ * Lives here so the token format is defined in one place.
+ */
+boardSchema.methods.rotateInviteToken = function () {
+  this.inviteToken = generateToken();
+  // A fresh link is a fresh grant, so past removals stop blocking anyone.
+  this.revokedUsers = [];
+  return this.inviteToken;
 };
 
 module.exports = mongoose.model('Board', boardSchema);
