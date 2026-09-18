@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "dev": "node --watch index.js",
+    "dev": "node --watch-path=./index.js --watch-path=./config --watch-path=./controllers --watch-path=./middleware --watch-path=./models index.js",
     "start": "node index.js"
   },
   "dependencies": {

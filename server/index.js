@@ -6,6 +6,8 @@ const cors = require('cors')
 const session = require('express-session')
 const { MongoStore } = require('connect-mongo')
 const connectDB = require('./config/db')
+const authController = require('./controllers/authController')
+const requireAuth = require('./middleware/requireAuth')
 
 for (const key of ['MONGO_URI', 'SESSION_SECRET']) {
     if (!process.env[key]) {
@@ -34,10 +36,19 @@ app.use(session({
         collectionName: 'sessions',
     }),
     cookie: {
-        maxAge: 1000 * 60 * 60 * 24, // 1 day
+        // No maxAge on purpose: that makes this a SESSION cookie, which the
+        // browser discards when it closes. Nothing identifying the user is left
+        // on the device between visits, so every new browser session starts
+        // logged out. (A maxAge here would write the cookie to disk instead.)
+        httpOnly: true,  // JS can't read it, so an XSS bug can't lift the session
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'lax',
     },
+    // The server-side half of the same decision. connect-mongo normally derives
+    // its TTL from cookie.maxAge; with no maxAge it falls back to a 14-day
+    // default, which would leave session documents in Mongo long after the
+    // cookies that referenced them were gone.
+    ttl: 60 * 60 * 24, // seconds
 }))
 
 
@@ -69,10 +80,12 @@ const notImplemented = (req, res) => {
  * First group to implement for real: every route below needs to know who is
  * asking, and that identity comes from the session these routes establish.
  */
-app.post('/api/auth/register', notImplemented)
-app.post('/api/auth/login', notImplemented)
-app.post('/api/auth/logout', notImplemented)
-app.get('/api/auth/me', notImplemented)            // current session's user, or null
+app.post('/api/auth/register', authController.register)
+app.post('/api/auth/login', authController.login)
+// requireAuth on logout so logging out while already logged out is a 401 rather
+// than a silent 204 that implies a session was ended.
+app.post('/api/auth/logout', requireAuth, authController.logout)
+app.get('/api/auth/me', authController.me)         // current session's user, or null
 
 /* --- Boards ------------------------------------------- boardController.js --
  * NOTE ON ORDER: Express matches routes in registration order, first match
@@ -125,5 +138,5 @@ app.get('/api/photos/search', notImplemented)      // ?tags=sunset,beach&sort= â
 app.get('/api/discover', notImplemented)           // Pixabay proxy; filters out the user's saved images
 
 app.listen(port, ()=>{
-    console.log(`listening on port ${port}`)
+    console.log(`listening on http://localhost:${port}/api/hello`)
 })
