@@ -62,7 +62,8 @@ export default function Search() {
         </form>
 
         <p className="muted">
-          Searches Pixabay tags and your own tags, across every board you can see.
+          Separate tags with commas. Results must match <strong>every</strong> tag, and come
+          from Pixabay's tags or your own, across every board you can see.
         </p>
 
         {results.loading && tags && <SkeletonGrid count={6} />}
@@ -75,8 +76,8 @@ export default function Search() {
         )}
 
         {tags && !results.loading && !results.error && list.length === 0 && (
-          <EmptyState title={`No photos tagged “${tags}”`}>
-            <p>Only photos on boards you can view are searchable.</p>
+          <EmptyState title={`No photos match all of “${tags.split(',').join(', ')}”`}>
+            <p>Try fewer tags. Only photos on boards you can view are searchable.</p>
           </EmptyState>
         )}
 

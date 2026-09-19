@@ -12,7 +12,12 @@ const parseTags = (raw) =>
 
 /**
  * GET /api/photos/search?tags=sunset,beach&sort=asc|desc
- * Matches on Photo.sourceTags, then keeps only hits the caller may actually see.
+ *
+ * AND semantics: a photo has to carry EVERY tag searched, not just one of them.
+ * The database query stays an $in (any tag) because a photo's tags are split
+ * across two documents — Photo.sourceTags and the link's userTags — so "does it
+ * have all of them" can only be answered once both halves are in hand. The $in
+ * narrows the candidates to something small, then the AND filter runs below.
  */
 exports.searchPhotos = async (req, res) => {
   const tags = parseTags(req.query.tags);
@@ -40,6 +45,11 @@ exports.searchPhotos = async (req, res) => {
   for (const link of links) {
     if (!link.boardId || !link.photoId) continue;
     if (!link.boardId.canView(req.session?.userId)) continue;
+
+    // Every searched tag has to appear somewhere on this pairing — either in
+    // the image's own Pixabay tags or in the tags this board put on it.
+    const owned = new Set([...(link.photoId.sourceTags ?? []), ...(link.userTags ?? [])]);
+    if (!tags.every((tag) => owned.has(tag))) continue;
 
     // One tile per image even when it appears on several visible boards.
     const key = String(link.photoId._id);
