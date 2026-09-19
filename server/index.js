@@ -116,6 +116,7 @@ app.get('/api/b/:shareSlug', boardController.showBySlug)
 app.get('/api/boards/:id/photos', loadBoard('view'), boardPhotoController.list)  // ?sort=asc|desc
 app.post('/api/boards/:id/photos', requireAuth, loadBoard('edit'), boardPhotoController.add)
 app.delete('/api/boards/:id/photos/:photoId', requireAuth, loadBoard('edit'), boardPhotoController.remove)
+app.patch('/api/boards/:id/photos/:photoId', requireAuth, loadBoard('edit'), boardPhotoController.setTags)
 
 /* --- Bookmarks & profile ------------------------------ boardController.js --
  * Saving someone else's board is a bookmark, not a copy: it pushes an id onto

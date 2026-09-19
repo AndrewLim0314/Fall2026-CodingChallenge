@@ -10,6 +10,7 @@ const boardPhoto = (link) => ({
   thumbnailUrl: link.photoId.thumbnailUrl,
   pageUrl: link.photoId.pageUrl,
   tags: link.photoId.sourceTags,
+  userTags: link.userTags ?? [],
   // Populated when it came through list(); fall back to the raw id otherwise.
   addedBy: link.addedBy?._id ?? link.addedBy,
   addedByUsername: link.addedBy?.username,
@@ -107,4 +108,26 @@ exports.remove = async (req, res) => {
 
   const boardTags = await BoardPhoto.syncBoardTags(req.board._id);
   res.json({ boardTags });
+};
+
+/**
+ * PATCH /api/boards/:id/photos/:photoId — replace this link's user tags.
+ *
+ * Scoped to the pair, not the Photo: one image can carry different tags on
+ * different boards, and tagging never touches the shared Photo document.
+ */
+exports.setTags = async (req, res) => {
+  const userTags = normalizeTags(req.body?.tags);
+
+  const result = await BoardPhoto.updateOne(
+    { boardId: req.board._id, photoId: req.params.photoId },
+    { $set: { userTags } },
+  );
+
+  // matchedCount, not modifiedCount: timestamps make every update a write.
+  if (result.matchedCount === 0) {
+    return res.status(404).json({ error: 'That photo is not on this board' });
+  }
+
+  res.json({ userTags });
 };

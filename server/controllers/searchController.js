@@ -21,9 +21,13 @@ exports.searchPhotos = async (req, res) => {
   const direction = req.query.sort === 'asc' ? 1 : -1;
 
   const photos = await Photo.find({ sourceTags: { $in: tags } }).select('_id').limit(500);
-  if (photos.length === 0) return res.json({ results: [] });
 
-  const links = await BoardPhoto.find({ photoId: { $in: photos.map((p) => p._id) } })
+  // Two ways to match: the image's own Pixabay tags, or tags a board member put
+  // on that link. $or rather than two queries so the sort stays global.
+  const match = [{ userTags: { $in: tags } }];
+  if (photos.length > 0) match.push({ photoId: { $in: photos.map((p) => p._id) } });
+
+  const links = await BoardPhoto.find({ $or: match })
     .sort({ addedAt: direction })
     .populate('photoId')
     .populate('boardId');
@@ -53,7 +57,11 @@ exports.searchPhotos = async (req, res) => {
       byPhoto.set(key, entry);
       results.push(entry);
     }
-    byPhoto.get(key).boards.push({ id: link.boardId._id, name: link.boardId.name });
+    byPhoto.get(key).boards.push({
+      id: link.boardId._id,
+      name: link.boardId.name,
+      userTags: link.userTags ?? [],
+    });
   }
 
   res.json({ results });

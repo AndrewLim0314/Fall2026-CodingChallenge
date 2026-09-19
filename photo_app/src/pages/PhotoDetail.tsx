@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import type { BoardPhoto } from '../api'
 import { Link, useNavigate, useParams } from 'react-router'
 import { api, canEdit } from '../api'
 import ErrorMessage from '../components/ErrorMessage'
@@ -85,6 +86,24 @@ export default function PhotoDetail() {
         />
 
         <p>{photo.tags.join(', ')}</p>
+        <p className="muted">From Pixabay — shared by every board with this photo.</p>
+
+        <UserTags
+          boardId={boardId}
+          photo={photo}
+          editable={writable}
+          onSaved={(userTags) =>
+            photos.setData((current) =>
+              current
+                ? {
+                    photos: current.photos.map((p) =>
+                      p.id === photo.id ? { ...p, userTags } : p,
+                    ),
+                  }
+                : current,
+            )
+          }
+        />
 
         <p>
           <small className="muted">
@@ -108,5 +127,84 @@ export default function PhotoDetail() {
         )}
       </main>
     </>
+  )
+}
+
+/** Your tags for this photo on this board. Any collaborator may edit them. */
+function UserTags({
+  boardId,
+  photo,
+  editable,
+  onSaved,
+}: {
+  boardId: string
+  photo: BoardPhoto
+  editable: boolean
+  onSaved: (userTags: string[]) => void
+}) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(photo.userTags.join(', '))
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const save = async () => {
+    setSaving(true)
+    setError(null)
+    try {
+      const { userTags } = await api.boardPhotos.setTags(
+        boardId,
+        photo.id,
+        draft.split(',').map((t) => t.trim()).filter(Boolean),
+      )
+      onSaved(userTags)
+      setEditing(false)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not save tags')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (editing) {
+    return (
+      <section className="panel stack">
+        <label htmlFor="usertags">Your tags for this board</label>
+        <input
+          id="usertags"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          placeholder="vacation, living room"
+        />
+        <div className="row">
+          <button type="button" className="btn--primary" onClick={save} disabled={saving}>
+            {saving ? 'Saving…' : 'Save tags'}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setDraft(photo.userTags.join(', '))
+              setEditing(false)
+            }}
+          >
+            Cancel
+          </button>
+        </div>
+        {error && <ErrorMessage message={error} />}
+      </section>
+    )
+  }
+
+  return (
+    <section className="panel row">
+      <span>
+        <strong>Your tags: </strong>
+        {photo.userTags.length > 0 ? photo.userTags.join(', ') : <span className="muted">none yet</span>}
+      </span>
+      {editable && (
+        <button type="button" className="spacer" onClick={() => setEditing(true)}>
+          {photo.userTags.length > 0 ? 'Edit tags' : 'Add tags'}
+        </button>
+      )}
+    </section>
   )
 }

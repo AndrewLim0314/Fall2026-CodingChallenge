@@ -34,6 +34,12 @@ const boardPhotoSchema = new mongoose.Schema({
   // Per-board timestamp, which is why it lives here and not on Photo: the same
   // image can be added to two boards on different days. This is the field the
   // board view and search results sort on.
+  // Tags this user put on the photo FOR THIS BOARD. Distinct from
+  // Photo.sourceTags, which is shared by every board holding the image.
+  userTags: {
+    type: [String],
+    default: [],
+  },
   addedAt: {
     type: Date,
     default: Date.now,
@@ -43,6 +49,10 @@ const boardPhotoSchema = new mongoose.Schema({
 // Loading a board means fetching its links newest-or-oldest first, so index the
 // exact shape of that query rather than boardId alone.
 boardPhotoSchema.index({ boardId: 1, addedAt: -1 });
+
+// Tag search reads userTags across every link, the same way it reads
+// Photo.sourceTags — without this it scans the whole collection.
+boardPhotoSchema.index({ userTags: 1 });
 
 // A board can't hold the same image twice. Enforced in the database rather than
 // with a read-then-write check in the route, which could race and let a

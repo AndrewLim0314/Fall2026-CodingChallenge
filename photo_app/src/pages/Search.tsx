@@ -61,7 +61,9 @@ export default function Search() {
           </button>
         </form>
 
-        <p className="muted">Searches every photo on boards you can see.</p>
+        <p className="muted">
+          Searches Pixabay tags and your own tags, across every board you can see.
+        </p>
 
         {results.loading && tags && <SkeletonGrid count={6} />}
         {results.error && <ErrorMessage message={results.error} onRetry={results.reload} />}
@@ -85,12 +87,15 @@ export default function Search() {
                 <img src={photo.thumbnailUrl} alt={photo.tags.join(', ')} loading="lazy" />
                 <figcaption className="card__body">
                   <p className="card__tags">{photo.tags.join(', ')}</p>
-                  <div className="row">
+                  <div className="stack">
                     {/* One tile per image, even when it sits on several boards. */}
                     {photo.boards.map((board) => (
-                      <Link key={board.id} to={`/boards/${board.id}/photos/${photo.id}`}>
-                        {board.name}
-                      </Link>
+                      <div key={board.id}>
+                        <Link to={`/boards/${board.id}/photos/${photo.id}`}>{board.name}</Link>
+                        {board.userTags.length > 0 && (
+                          <span className="muted"> · {board.userTags.join(', ')}</span>
+                        )}
+                      </div>
                     ))}
                   </div>
                 </figcaption>

@@ -35,6 +35,8 @@ export type BoardPhoto = {
   thumbnailUrl: string
   pageUrl: string
   tags: string[]
+  /** Tags this board's members added; separate from the shared Pixabay tags. */
+  userTags: string[]
   addedBy: string
   /** Populated by the list route; absent if the account no longer exists. */
   addedByUsername?: string
@@ -63,7 +65,7 @@ export type SearchResult = {
   pageUrl: string
   tags: string[]
   addedAt: string
-  boards: { id: string; name: string }[]
+  boards: { id: string; name: string; userTags: string[] }[]
 }
 
 export type MyBoards = {
