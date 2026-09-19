@@ -5,6 +5,7 @@ import AcceptInvite from './pages/AcceptInvite'
 import BoardDetail from './pages/BoardDetail'
 import Boards from './pages/Boards'
 import Discover from './pages/Discover'
+import DiscoverBoards from './pages/DiscoverBoards'
 import Login from './pages/Login'
 import NotFound from './pages/NotFound'
 import PhotoDetail from './pages/PhotoDetail'
@@ -29,6 +30,7 @@ export default function App() {
             <Route path="/feed" element={<Discover />} />
             <Route path="/search" element={<Search />} />
             <Route path="/boards" element={<Boards />} />
+            <Route path="/discover-boards" element={<DiscoverBoards />} />
             <Route path="/boards/:id" element={<BoardDetail />} />
             <Route path="/boards/:boardId/photos/:photoId" element={<PhotoDetail />} />
             <Route path="/invite/:token" element={<AcceptInvite />} />

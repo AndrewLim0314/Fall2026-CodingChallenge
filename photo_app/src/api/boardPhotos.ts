@@ -5,6 +5,13 @@ export const list = (boardId: string, sort: SortOrder = 'desc') =>
   request<{ photos: BoardPhoto[] }>(`/boards/${boardId}/photos`, { query: { sort } })
 
 /**
+ * The same list reached by share link. Authorized by the slug, so it works on a
+ * private board — which `list` above cannot, since it authorizes by board id.
+ */
+export const listBySlug = (shareSlug: string, sort: SortOrder = 'desc') =>
+  request<{ photos: BoardPhoto[] }>(`/b/${shareSlug}/photos`, { query: { sort } })
+
+/**
  * Takes a DiscoverPhoto unchanged — including its comma-separated `tags` string,
  * which the server normalizes. Responds with the board's re-derived tags.
  */

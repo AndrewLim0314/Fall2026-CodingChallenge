@@ -1,5 +1,21 @@
 // controllers/collaboratorController.js
 const Board = require('../models/Board');
+const User = require('../models/User');
+
+/**
+ * GET /api/boards/:id/collaborators — owner only.
+ *
+ * Its own route rather than a field on publicBoard: every other board response
+ * would then have to populate users it doesn't need, and who can edit a board
+ * is the owner's business, not a viewer's.
+ */
+exports.list = async (req, res) => {
+  const users = await User.find({ _id: { $in: req.board.collaborators } })
+    .select('username')
+    .lean();
+
+  res.json({ collaborators: users.map((u) => ({ id: u._id, username: u.username })) });
+};
 
 /**
  * POST /api/boards/:id/invite — owner only.

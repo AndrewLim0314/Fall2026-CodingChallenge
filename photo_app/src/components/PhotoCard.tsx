@@ -10,16 +10,21 @@ type Props = {
 
 /** One feed tile, with its own save control and its own error state. */
 export default function PhotoCard({ photo, boards, onSave }: Props) {
-  const [boardId, setBoardId] = useState(boards[0]?.id ?? '')
+  const [boardId, setBoardId] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // Boards can finish loading after the feed does, so the default is resolved
+  // at render rather than captured at mount — otherwise the untouched select
+  // shows a board while its state is still '' and Save silently does nothing.
+  const selected = boardId || boards[0]?.id || ''
+
   const handleSave = async () => {
-    if (!boardId) return
+    if (!selected) return
     setSaving(true)
     setError(null)
     try {
-      await onSave(photo, boardId)
+      await onSave(photo, selected)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not save')
       setSaving(false)
@@ -38,7 +43,7 @@ export default function PhotoCard({ photo, boards, onSave }: Props) {
         {boards.length > 0 && (
           <div className="row">
             <select
-              value={boardId}
+              value={selected}
               onChange={(e) => setBoardId(e.target.value)}
               disabled={saving}
               aria-label="Board to save to"

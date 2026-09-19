@@ -12,7 +12,8 @@ export default function Boards() {
   const boards = useAsync(() => api.boards.myBoards(), [])
 
   const [name, setName] = useState('')
-  const [isPublic, setIsPublic] = useState(false)
+  // Boards are public by default, matching the server's own default.
+  const [isPublic, setIsPublic] = useState(true)
   const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
 
@@ -26,7 +27,7 @@ export default function Boards() {
     try {
       await api.boards.create({ name: trimmed, isPublic })
       setName('')
-      setIsPublic(false)
+      setIsPublic(true)
       boards.reload()
     } catch (err) {
       // 409 here means a name collision with one of your own boards.

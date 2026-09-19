@@ -90,7 +90,12 @@ boardSchema.methods.canEdit = function (userId) {
 
 boardSchema.methods.isOwner = function (userId) {
   if (!userId) return false;
-  return this.owner.equals(userId);
+  // owner may be populated (the Discover Boards feed joins the username), in
+  // which case it's a User document rather than an ObjectId — and null if that
+  // account is gone, since populate nulls a dangling ref. Reading _id works for
+  // both live shapes, because ObjectId._id returns itself.
+  const ownerId = this.owner?._id ?? this.owner;
+  return ownerId ? ownerId.equals(userId) : false;
 };
 
 /**

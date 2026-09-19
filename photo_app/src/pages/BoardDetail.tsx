@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { api, canEdit, isOwner } from '../api'
-import type { SortOrder } from '../api'
+import type { Board, SortOrder } from '../api'
 import EmptyState from '../components/EmptyState'
 import ErrorMessage from '../components/ErrorMessage'
 import Header from '../components/Header'
@@ -152,7 +152,7 @@ export default function BoardDetail() {
 
         {copied && <p className="muted">{copied}</p>}
 
-        {owner && <InvitePanel board={current} />}
+        {owner && <InvitePanel board={current} onChanged={board.reload} />}
 
         {photos.loading && <SkeletonGrid count={6} />}
         {photos.error && <ErrorMessage message={photos.error} onRetry={photos.reload} />}
@@ -195,12 +195,14 @@ export default function BoardDetail() {
 }
 
 /** Owner-only. inviteToken is present exactly when the viewer owns the board. */
-function InvitePanel({ board }: { board: { id: string; inviteToken?: string } }) {
+function InvitePanel({ board, onChanged }: { board: Board; onChanged: () => void }) {
   const [token, setToken] = useState(board.inviteToken ?? '')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
+  const [removing, setRemoving] = useState<string | null>(null)
 
+  const collaborators = useAsync(() => api.collaborators.list(board.id), [board.id])
   const link = `${window.location.origin}/invite/${token}`
 
   const rotate = async () => {
@@ -219,6 +221,27 @@ function InvitePanel({ board }: { board: { id: string; inviteToken?: string } })
     }
   }
 
+  const revoke = async (userId: string) => {
+    setRemoving(userId)
+    setError(null)
+    try {
+      await api.collaborators.revoke(board.id, userId)
+      collaborators.setData((current) =>
+        current
+          ? { collaborators: current.collaborators.filter((c) => c.id !== userId) }
+          : current,
+      )
+      // collaboratorCount lives on the board, so it has to be refetched too.
+      onChanged()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not remove that collaborator')
+    } finally {
+      setRemoving(null)
+    }
+  }
+
+  const list = collaborators.data?.collaborators ?? []
+
   return (
     <section className="panel stack">
       <strong>Invite collaborators</strong>
@@ -236,6 +259,32 @@ function InvitePanel({ board }: { board: { id: string; inviteToken?: string } })
         </button>
         {copied && <span className="muted">Copied</span>}
       </div>
+
+      <strong>Collaborators</strong>
+      {collaborators.loading && <Spinner label="Loading collaborators…" />}
+      {list.length === 0 && !collaborators.loading && (
+        <p className="muted">No one has accepted the invite yet.</p>
+      )}
+      {list.length > 0 && (
+        <ul className="board-list">
+          {list.map((person) => (
+            <li key={person.id}>
+              {person.username}{' '}
+              <button
+                type="button"
+                className="btn--danger"
+                onClick={() => revoke(person.id)}
+                disabled={removing === person.id}
+              >
+                {removing === person.id ? 'Removing…' : 'Remove'}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {/* Removing blocks them from re-accepting the same link; rotating the
+          token clears that, because a new link is a new grant. */}
+
       {error && <ErrorMessage message={error} />}
     </section>
   )

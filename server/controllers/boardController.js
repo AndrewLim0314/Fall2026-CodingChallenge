@@ -8,12 +8,18 @@ const User = require('../models/User');
  * inviteToken grants editing, and shareSlug grants viewing a private board.
  */
 const publicBoard = (board, userId) => {
+  // owner is an ObjectId normally, a User document where the caller populated
+  // it, and null if that user no longer exists — populate nulls a dangling ref
+  // rather than leaving the id behind. Emit the id either way, plus the
+  // username when we actually have one.
+  const owner = board.owner;
   const out = {
     id: board._id,
     name: board.name,
     tags: board.tags,
     isPublic: board.isPublic,
-    owner: board.owner,
+    owner: owner?._id ?? owner ?? null,
+    ...(owner?.username ? { ownerUsername: owner.username } : {}),
     collaboratorCount: board.collaborators.length,
     createdAt: board.createdAt,
     updatedAt: board.updatedAt,
@@ -23,9 +29,17 @@ const publicBoard = (board, userId) => {
   return out;
 };
 
-/** GET /api/boards/discover — every public board, newest activity first. */
+/**
+ * GET /api/boards/discover — every public board, newest activity first.
+ * Board names are unique per owner, not globally, so a card is only meaningful
+ * with its owner's name attached — hence the populate.
+ */
 exports.discover = async (req, res) => {
-  const boards = await Board.find({ isPublic: true }).sort({ updatedAt: -1 }).limit(50);
+  const boards = await Board.find({ isPublic: true })
+    .sort({ updatedAt: -1 })
+    .limit(50)
+    .populate('owner', 'username');
+
   res.json({ boards: boards.map((b) => publicBoard(b, req.session?.userId)) });
 };
 

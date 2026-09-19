@@ -1,4 +1,9 @@
 import { request } from './client'
+import type { Collaborator } from './types'
+
+/** Owner-only: who can currently edit this board. */
+export const list = (boardId: string) =>
+  request<{ collaborators: Collaborator[] }>(`/boards/${boardId}/collaborators`)
 
 /**
  * Owner-only. `rotate` mints a new token, which invalidates the old link and

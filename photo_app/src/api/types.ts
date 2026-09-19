@@ -20,11 +20,19 @@ export type Board = {
   tags: string[]
   isPublic: boolean
   owner: string
+  /** Only sent where the server populated it — the Discover Boards feed. */
+  ownerUsername?: string
   collaboratorCount: number
   createdAt: string
   updatedAt: string
   shareSlug?: string
   inviteToken?: string
+}
+
+/** A board's collaborator, from the owner-only list route. */
+export type Collaborator = {
+  id: string
+  username: string
 }
 
 /** A photo saved on a board. `tags` is an array here, unlike DiscoverPhoto. */

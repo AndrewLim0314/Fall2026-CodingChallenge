@@ -16,11 +16,9 @@ export default function SharedBoard() {
   const { user } = useAuth()
 
   const board = useAsync(() => api.boards.getBySlug(shareSlug), [shareSlug])
-  const boardId = board.data?.board.id
-  const photos = useAsync(
-    () => (boardId ? api.boardPhotos.list(boardId) : Promise.resolve({ photos: [] })),
-    [boardId ?? ''],
-  )
+  // Both calls key off the slug, so the photos don't wait on the board and a
+  // private board resolves too — /boards/:id/photos would 404 on one.
+  const photos = useAsync(() => api.boardPhotos.listBySlug(shareSlug), [shareSlug])
 
   if (board.loading) {
     return (

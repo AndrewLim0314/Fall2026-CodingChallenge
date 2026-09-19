@@ -1,4 +1,5 @@
 // controllers/boardPhotoController.js
+const Board = require('../models/Board');
 const Photo = require('../models/Photo');
 const BoardPhoto = require('../models/BoardPhoto');
 
@@ -41,16 +42,33 @@ async function findOrCreatePhoto(fields) {
   }
 }
 
-/** GET /api/boards/:id/photos — ?sort=asc|desc on addedAt, newest first by default. */
-exports.list = async (req, res) => {
-  const direction = req.query.sort === 'asc' ? 1 : -1;
-  const links = await BoardPhoto.find({ boardId: req.board._id })
+/** A board's links, newest first unless ?sort=asc. Shared by both list routes. */
+async function listPhotos(boardId, sort) {
+  const direction = sort === 'asc' ? 1 : -1;
+  const links = await BoardPhoto.find({ boardId })
     .sort({ addedAt: direction })
     .populate('photoId')
     // Only the username — publicUser's whitelist rule applies here too.
     .populate('addedBy', 'username');
 
-  res.json({ photos: links.map(boardPhoto) });
+  return links.map(boardPhoto);
+}
+
+/** GET /api/boards/:id/photos — ?sort=asc|desc on addedAt, newest first by default. */
+exports.list = async (req, res) => {
+  res.json({ photos: await listPhotos(req.board._id, req.query.sort) });
+};
+
+/**
+ * GET /api/b/:shareSlug/photos — the same list, reached by share link.
+ * Authorizes by slug rather than by board id: holding the link is its own grant
+ * to view, which is exactly the case loadBoard('view') can't answer.
+ */
+exports.listBySlug = async (req, res) => {
+  const board = await Board.findOne({ shareSlug: req.params.shareSlug }).select('_id');
+  if (!board) return res.status(404).json({ error: 'Board not found' });
+
+  res.json({ photos: await listPhotos(board._id, req.query.sort) });
 };
 
 /** POST /api/boards/:id/photos — save a Pixabay image onto this board. */

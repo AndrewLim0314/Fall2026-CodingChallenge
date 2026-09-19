@@ -18,6 +18,9 @@ export default function Header() {
       <NavLink to="/boards" className={className}>
         Boards
       </NavLink>
+      <NavLink to="/discover-boards" className={className}>
+        Discover
+      </NavLink>
       <span className="nav__user spacer">{user?.username}</span>
       <LogoutButton />
     </nav>

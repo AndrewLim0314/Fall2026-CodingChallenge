@@ -36,3 +36,8 @@ pnpm-debug.log*
 # OS
 .DS_Store
 Thumbs.db
+
+# Local-only working notes — never commit
+CLAUDE.md
+SUMMARY.md
+.claude/

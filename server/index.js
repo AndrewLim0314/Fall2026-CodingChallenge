@@ -64,22 +64,13 @@ app.get('/api/hello', (req, res) => {
 
 /**
  * ---------------------------------------------------------------------------
- * ROUTE SCAFFOLD
+ * ROUTES
  *
- * Every endpoint the app needs, stubbed out so the whole API surface is
- * visible in one place. Each group is headed by the controller it will move
- * into once the shape settles; the goal of listing them together first is to
- * see which routes share a prefix, a model, and a permission check.
- *
- * Handlers are intentionally empty — hitting any of these returns 501.
+ * The whole API surface in one place, grouped by the controller that serves it.
+ * Keeping the table together makes it obvious which routes share a prefix, a
+ * model, and a permission check — the three things that have to agree.
  * ---------------------------------------------------------------------------
  */
-
-// Placeholder handler. Lets a route exist and answer predictably before it
-// does anything, so the frontend can be wired against the real URLs early.
-const notImplemented = (req, res) => {
-    res.status(501).json({ error: 'Not implemented yet' })
-}
 
 /* --- Auth ---------------------------------------------- authController.js --
  * First group to implement for real: every route below needs to know who is
@@ -107,6 +98,10 @@ app.delete('/api/boards/:id', requireAuth, loadBoard('own'), boardController.rem
 // Share link. A separate path from /api/boards/:id because holding the slug is
 // its own route to viewing — it works even when the board is private.
 app.get('/api/b/:shareSlug', boardController.showBySlug)
+// The board's contents by slug too. /api/boards/:id/photos authorizes by board
+// id via loadBoard, which knows nothing about slugs — so a private board opened
+// by share link would render empty without this.
+app.get('/api/b/:shareSlug/photos', boardPhotoController.listBySlug)
 
 /* --- Board contents ----------------------------- boardPhotoController.js --
  * Operates on the BoardPhoto join, not on Photo itself. Removing a photo here
@@ -132,6 +127,7 @@ app.get('/api/me/boards', requireAuth, boardController.myBoards)   // owned / sa
  * to be seen never hands out edit rights. Permissions are flat: any
  * collaborator can edit anything on the board.
  */
+app.get('/api/boards/:id/collaborators', requireAuth, loadBoard('own'), collaboratorController.list)
 app.post('/api/boards/:id/invite', requireAuth, loadBoard('own'), collaboratorController.invite)
 app.post('/api/invite/:inviteToken', requireAuth, collaboratorController.accept)
 app.delete('/api/boards/:id/collaborators/:userId', requireAuth, loadBoard('own'), collaboratorController.revoke)
