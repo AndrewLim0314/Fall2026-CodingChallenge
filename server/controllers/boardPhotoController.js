@@ -10,7 +10,9 @@ const boardPhoto = (link) => ({
   thumbnailUrl: link.photoId.thumbnailUrl,
   pageUrl: link.photoId.pageUrl,
   tags: link.photoId.sourceTags,
-  addedBy: link.addedBy,
+  // Populated when it came through list(); fall back to the raw id otherwise.
+  addedBy: link.addedBy?._id ?? link.addedBy,
+  addedByUsername: link.addedBy?.username,
   addedAt: link.addedAt,
 });
 
@@ -43,7 +45,9 @@ exports.list = async (req, res) => {
   const direction = req.query.sort === 'asc' ? 1 : -1;
   const links = await BoardPhoto.find({ boardId: req.board._id })
     .sort({ addedAt: direction })
-    .populate('photoId');
+    .populate('photoId')
+    // Only the username — publicUser's whitelist rule applies here too.
+    .populate('addedBy', 'username');
 
   res.json({ photos: links.map(boardPhoto) });
 };
